@@ -1,5 +1,6 @@
 import userService from '../services/user.service.js';
 
+
 const register = async (req, res) => {
     const { username, email, password } = req.body;
 

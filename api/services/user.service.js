@@ -1,10 +1,11 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import db from '../models/User.js';
+import userService from '../services/user.service.js';
 
 const registerUser = async ({ username, email, password }) => {
     // Verifica se já existe um usuário com o email informado
-    const existingUser = await User.findOne({ email });
+    const existingUser = await db.findOne({ where: { email } });
     if (existingUser) {
         throw { status: 409, message: 'Email already in use' };
     }
@@ -12,7 +13,7 @@ const registerUser = async ({ username, email, password }) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = await User.create({
+    const newUser = await db.create({
         username,
         email,
         password: hashedPassword
@@ -22,9 +23,11 @@ const registerUser = async ({ username, email, password }) => {
 };
 
 const loginUser = async ({ username, email, password }) => {
-    const user = await User.findOne(
-        username ? { username } : { email }
-    ).select('+password');
+    const whereCondition = username ? { username } : { email };
+    const user = await db.findOne({ 
+        where: whereCondition,
+        attributes: ['id', 'username', 'email', 'password'] // Inclui password explicitamente
+    });
 
     if (!user) {
         throw { status: 404, message: 'User not found' };
@@ -35,11 +38,14 @@ const loginUser = async ({ username, email, password }) => {
         throw { status: 401, message: 'Invalid credentials' };
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
         expiresIn: '1h'
     });
 
-    return { user, token };
+    // Remove a senha antes de retornar
+    const userWithoutPassword = { id: user.id, username: user.username, email: user.email };
+    
+    return { user: userWithoutPassword, token };
 };
 
 export default {
